@@ -2,6 +2,8 @@ from typing import Literal, Dict, Optional, Tuple
 from abc import ABC, abstractmethod
 import warnings
 
+import torch as th
+
 import casadi as cs, numpy.typing as npt, numpy as np
 from csnlp.wrappers import Mpc
 from csnlp import Nlp, wrappers
@@ -185,4 +187,56 @@ class BaseNMPC(Mpc, ABC):
             result[name] = vector[offset:offset+size].reshape(shape)
             offset += size
         return result
+
+class NMPCAutogradFunction(th.autograd.Function):
+    """
+    
+    """
+    @staticmethod
+    def forward(ctx, nmpc: BaseNMPC, x_0: th.Tensor, learnable_params: Dict, nonlearnable_params: Dict) -> th.Tensor:
+        """
+        
+        """
+        u_cmd = nmpc.forward(
+            x_0=x_0.detach().cpu().numpy(),
+            learnable_params={key: val.detach().cpu().numpy() for key, val in learnable_params.items()},
+            nonlearnable_params=nonlearnable_params
+        )
+
+        # Compute sensitivities from casadi
+        sensitivities = nmpc.get_mpc_sensitivities() # shape = (nu, n_learnable_params)
+
+        # Cache for backward
+        ctx.nmpc = nmpc
+        ctx.sensitivities = th.from_numpy(sensitivities).float()
+        ctx.learnable_param_names = list(learnable_params.keys())
+        ctx.save_for_backward(*learnable_params.values())
+
+        return th.from_numpy(u_cmd).float()
+    
+    @staticmethod
+    def backward(ctx, *grad_outputs):
+        """
+        
+        """
+        # Extract the single gradient
+        grad_output = grad_outputs[0] # shape = (batch_size, nu)
+
+        sensitivities = ctx.sensitivities # shape = (nu, n_learnable_params)
+
+        # Gradient w.r.t to learnable params
+        if grad_output.dim() == 1: # Single observation
+            grad_params = grad_output @ sensitivities # shape = (n_learnable params,)
+        else: # Batch observation
+            grad_params = (grad_output @ sensitivities).sum(0) # shape = (n_learnable_params,)
+
+        # Split gradients back to individual parameters
+        grads, offset = [], 0
+        for saved_tensor in ctx.saved_tensors:
+            size = saved_tensor.numel()
+            grads.append(grad_params[offset:offset+size].reshape(saved_tensor.shape))
+            offset += size
+
+        # Return gradients w.r.t forward parameters
+        return None, None, tuple(grads), None
 
