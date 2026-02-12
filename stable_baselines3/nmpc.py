@@ -42,6 +42,8 @@ class BaseNMPC(Mpc, ABC):
             nu: int, 
             u_lb: npt.NDArray,
             u_ub: npt.NDArray,
+            x_lb: Optional[npt.NDArray] = None,
+            x_ub: Optional[npt.NDArray] = None,
             learnable_params: Optional[Dict[str, Tuple]] = None,
             params: Optional[Dict[str, Tuple]] = None,
             shooting: Literal["single", "multi"] = "multi",
@@ -56,6 +58,8 @@ class BaseNMPC(Mpc, ABC):
         self.nu = nu
         self.u_lb = u_lb.reshape(-1, 1)
         self.u_ub = u_ub.reshape(-1, 1)
+        self.x_lb = x_lb.reshape(-1, 1) if x_lb is not None else np.array(self.nx * [-np.inf])
+        self.x_ub = x_ub.reshape(-1, 1) if x_ub is not None else np.array(self.nx * [np.inf])
         self.prev_sol = None
 
         # Store learnable parameters in a dict. Needed to discriminate learnable from non-learnable ones
@@ -73,14 +77,21 @@ class BaseNMPC(Mpc, ABC):
 
         self.shooting = shooting
 
-        assert self.u_lb.shape[0] == self.nu, f"Lower bound of u must have same its first dimension equal to nu={self.nu}, but self.u_lb.shape = {self.u_lb.shape}."
-        assert self.u_ub.shape[0] == self.nu, f"Upper bound of u must have same its first dimension equal to nu={self.nu}, but self.u_ub.shape = {self.u_ub.shape}."
+        assert self.u_lb.shape[0] == self.nu, f"Lower bound of u must have its first dimension equal to nu={self.nu}, but self.u_lb.shape = {self.u_lb.shape}."
+        assert self.u_ub.shape[0] == self.nu, f"Upper bound of u must have its first dimension equal to nu={self.nu}, but self.u_ub.shape = {self.u_ub.shape}."
+        assert self.x_lb.shape[0] == self.nx, f"Lower bound of x must have its first dimension equal to nx={self.nx}, but self.x_lb.shape = {self.x_lb.shape}."
+        assert self.x_ub.shape[0] == self.nx, f"Upper bound of x must have its first dimension equal to nx={self.nx}, but self.x_ub.shape = {self.x_ub.shape}."
 
         self.init_nlp(solver, solver_opts)
 
     def init_nlp(self, solver: Literal["ipopt"], solver_opts: Dict) -> None:
         # Create state symbol
-        x, _ = self.state("x", self.nx)
+        x, _ = self.state(
+            "x",
+            self.nx,
+            lb=self.x_lb.reshape(-1, 1),
+            ub=self.x_ub.reshape(-1, 1)
+        )
         assert x is not None, f"x was not defined correctly. x={x}"
 
         # Create control command symbol
