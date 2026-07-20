@@ -13,6 +13,8 @@ from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedul
 from stable_baselines3.common.utils import get_parameters_by_name, polyak_update
 from stable_baselines3.td3.policies import Actor, CnnPolicy, MlpPolicy, MultiInputPolicy, TD3Policy
 
+from stable_baselines3.td3.nmpc_td3 import TD3NMPCPolicy
+
 SelfTD3 = TypeVar("SelfTD3", bound="TD3")
 
 
@@ -70,6 +72,7 @@ class TD3(OffPolicyAlgorithm):
         "MlpPolicy": MlpPolicy,
         "CnnPolicy": CnnPolicy,
         "MultiInputPolicy": MultiInputPolicy,
+        "NMPC": TD3NMPCPolicy
     }
     policy: TD3Policy
     actor: Actor
@@ -79,7 +82,7 @@ class TD3(OffPolicyAlgorithm):
 
     def __init__(
         self,
-        policy: str | type[TD3Policy],
+        policy: str | type[TD3Policy] | type[TD3NMPCPolicy],
         env: GymEnv | str,
         learning_rate: float | Schedule = 1e-3,
         buffer_size: int = 1_000_000,  # 1e6

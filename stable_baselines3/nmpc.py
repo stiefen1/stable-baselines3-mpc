@@ -145,7 +145,6 @@ class BaseNMPC(Mpc, ABC):
         Forward pass of NMPC, i.e. solve and returns first control commands. Only the non-learnable parameters
         must be provided as input. 
         """
-        
         sol = self.solve(
             pars={"x_0": x_0.reshape(self.nx, 1)} | nonlearnable_params | learnable_params,
             *args,
@@ -167,7 +166,9 @@ class BaseNMPC(Mpc, ABC):
         assert self.prev_sol is not None, f"Previous solution is none."
         if len(self.learnable_params) > 0:
             mpc_ = wrappers.NlpSensitivity(self, cs.horzcat(*list(self.learnable_params.values()))) # type: ignore
-            return mpc_.parametric_sensitivity(self._actions["u"][:, 0], self.prev_sol, second_order=False)[0].full()
+            sensitivities = mpc_.parametric_sensitivity(self._actions["u"][:, 0], self.prev_sol, second_order=False)[0].full()
+            # print("sensitivities: ", sensitivities)
+            return sensitivities
         else:
             warnings.warn(f"No learnable parameters provided: Unable to compute MPC sensitivites.")
             return np.array([])
