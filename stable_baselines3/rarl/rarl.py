@@ -30,10 +30,10 @@ class RARL:
         )
 
         # Reach the player environments beneath FlattenObservation/Monitor.
-        # Bootstrap the protagonist without adversarial forces. Enable the
-        # opponent only once it has completed its first training phase.
+        # Round 1's protagonist phase trains against this untrained, randomly
+        # initialized adversary (Pinto et al. 2017, Algorithm 1: nu_theta0).
         self._protagonist_env = protagonist_env.unwrapped
-        self._protagonist_env.adversary = None
+        self._protagonist_env.adversary = self.adversary
         adversary_env.unwrapped.protagonist = self.protagonist
 
     def learn(
@@ -46,7 +46,6 @@ class RARL:
         Each player's timestep argument is its total_timesteps budget per
         phase. The caller controls how many rounds to run. SB3 may exceed a
         budget to finish a rollout (PPO collects n_steps * n_envs transitions).
-        Subsequent calls continue with the already trained adversary enabled.
         """
         print("Training protagonist...")
         self.protagonist.set_env(
@@ -71,6 +70,5 @@ class RARL:
             reset_num_timesteps=False,
             tb_log_name="adversary",
         )
-        self._protagonist_env.adversary = self.adversary
 
         return self
